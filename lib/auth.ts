@@ -1,30 +1,57 @@
-// ─── SellerGrid: NextAuth Config ───
+// ─── SellerGrid: Simple Password Auth ───
 import { NextAuthOptions } from 'next-auth';
-import GoogleProvider from 'next-auth/providers/google';
-import { MongoDBAdapter } from '@auth/mongodb-adapter';
+import CredentialsProvider from 'next-auth/providers/credentials';
 import { connectDB } from './mongodb';
 import UserModel from './models/User';
 
+const ADMIN_EMAIL = 'admin@sellergrid.co.za';
+const ADMIN_PASSWORD = 'admin321';
+
 export const authOptions: NextAuthOptions = {
-  adapter: MongoDBAdapter(connectDB() as any),
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        // Admin login
+        if (credentials.email === ADMIN_EMAIL && credentials.password === ADMIN_PASSWORD) {
+          await connectDB();
+          let user = await UserModel.findOne({ email: ADMIN_EMAIL });
+          if (!user) {
+            user = await UserModel.create({
+              email: ADMIN_EMAIL,
+              name: 'Admin',
+              credits: 9999,
+              role: 'owner',
+            });
+          }
+          return { id: user._id.toString(), email: user.email, name: user.name } as any;
+        }
+
+        // Regular users (future)
+        await connectDB();
+        const user = await UserModel.findOne({ email: credentials.email });
+        if (!user) return null;
+
+        // For now, only admin login supported
+        return null;
+      },
     }),
   ],
   session: { strategy: 'jwt' },
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-      }
+      if (user) token.id = user.id;
       return token;
     },
     async session({ session, token }) {
       if (session.user && token) {
         (session.user as any).id = token.id;
-        // Fetch credits from DB
         try {
           await connectDB();
           const dbUser = await UserModel.findOne({ email: session.user.email });
@@ -37,7 +64,5 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  pages: {
-    signIn: '/login',
-  },
+  pages: { signIn: '/login' },
 };

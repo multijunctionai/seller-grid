@@ -1,0 +1,4 @@
+# ─── SellerGrid: Caddyfile ───
+seller.miccell.co.za {
+	reverse_proxy app:3000
+}

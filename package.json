@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@auth/mongodb-adapter": "^3.11.2",
     "lucide-react": "^1.21.0",
     "mongodb": "^7.3.0",
     "mongoose": "^9.7.1",
